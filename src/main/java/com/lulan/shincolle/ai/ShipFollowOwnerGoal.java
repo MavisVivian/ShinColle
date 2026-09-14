@@ -5,6 +5,7 @@ import com.lulan.shincolle.handler.ConfigHandler;
 import com.lulan.shincolle.reference.ID;
 import com.lulan.shincolle.server.ServerDataManager;
 import com.lulan.shincolle.utility.DebugProfiler;
+import com.lulan.shincolle.utility.EntityHelper;
 import com.lulan.shincolle.utility.FormationHelper;
 import com.lulan.shincolle.utility.LogHelper;
 import com.lulan.shincolle.utility.ParticleHelper;
@@ -89,10 +90,9 @@ public class ShipFollowOwnerGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        updateDistance();
         ProfilerFiller profiler = DebugProfiler.push(this.hostEntity.level(), "shincolle.ai.follow_owner.continue");
         try {
-            if (host == null || owner == null) {
+            if (host == null || owner == null || owner.level() != this.hostEntity.level()) {
                 DebugProfiler.count(profiler, "shincolle.ai.follow_owner.continue.no_host_or_owner");
                 return false;
             }
@@ -101,6 +101,8 @@ public class ShipFollowOwnerGoal extends Goal {
                 this.stop();
                 return false;
             }
+
+            updateDistance();
 
             // still outside min range, keep going
             if (this.distSq > this.minDistSq) {
@@ -185,7 +187,8 @@ public class ShipFollowOwnerGoal extends Goal {
                     DebugProfiler.count(profiler, "shincolle.ai.follow_owner.tick.teleport_by_distance");
                     LogHelper.debug("DEBUG: follow AI: distSQ > " + ConfigHandler.shipTeleport[1] +
                             " , teleport to target.");
-                    this.hostEntity.teleportTo(this.owner.getX(), this.owner.getY() + 0.75D, this.owner.getZ());
+                    EntityHelper.teleportShipToEntity(this.hostEntity, this.owner, this.distSq,
+                            OWNER_TELEPORT_Y_OFFSET);
                     return;
                 }
             }
@@ -195,7 +198,8 @@ public class ShipFollowOwnerGoal extends Goal {
                 this.checkTP_T = 0;
                 DebugProfiler.count(profiler, "shincolle.ai.follow_owner.tick.teleport_by_stuck_time");
                 LogHelper.debug("DEBUG: follow AI: stuck time exceeded, teleport to target.");
-                this.hostEntity.teleportTo(this.owner.getX(), this.owner.getY() + 0.75D, this.owner.getZ());
+                EntityHelper.teleportShipToEntity(this.hostEntity, this.owner, this.distSq,
+                        OWNER_TELEPORT_Y_OFFSET);
             }
         } finally {
             DebugProfiler.pop(profiler);
@@ -251,7 +255,7 @@ public class ShipFollowOwnerGoal extends Goal {
                 }
 
             if (host.getStateFlag(ID.F.PickItem))
-                this.maxDistSq = 16D;
+                this.maxDistSq = 64D;
         }
         // no formation
         else {
@@ -282,7 +286,7 @@ public class ShipFollowOwnerGoal extends Goal {
      * Mirrors legacy follow-owner preconditions.
      */
     private boolean isFollowBlockedState() {
-        if (this.host.getIsSitting() || this.host.getIsRiding()) {
+        if (this.host.getIsSitting() || this.host.getIsRiding() || this.host.getIsLeashed()) {
             return true;
         }
 
@@ -303,17 +307,21 @@ public class ShipFollowOwnerGoal extends Goal {
      * Both BasicEntityShip and BasicEntityMount extend TamableAnimal.
      */
     private LivingEntity resolveOwner() {
+        LivingEntity resolvedOwner = null;
         int uid = this.host.getPlayerUID();
         if (uid > 0 && !this.hostEntity.level().isClientSide()) {
             ServerPlayer serverPlayer = ServerDataManager.getPlayerByUID(uid);
             if (serverPlayer != null) {
-                return serverPlayer;
+                resolvedOwner = serverPlayer;
             }
         }
 
-        if (hostEntity instanceof TamableAnimal tamable) {
-            return tamable.getOwner();
+        if (resolvedOwner == null && hostEntity instanceof TamableAnimal tamable) {
+            resolvedOwner = tamable.getOwner();
         }
-        return null;
+
+        return resolvedOwner != null && resolvedOwner.level() == this.hostEntity.level()
+                ? resolvedOwner
+                : null;
     }
 }

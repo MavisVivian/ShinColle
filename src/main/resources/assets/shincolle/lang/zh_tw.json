@@ -841,5 +841,6 @@
   "chat.shincolle.wrench.wptoofar": "深海路徑設定失敗，距離太遠！",
   "chat.shincolle.wrench.wrongtile": "不合適的方塊類型配對，箱子只能跟起重機配對，路徑點只能跟路徑點或起重機配對。",
   "chat.shincolle.wrongowner": "你不是擁有者：",
+  "chat.shincolle.pointer.settargetclass": "Set target type to attack list: %s",
   "creativetab.shincolle": "ShinColle"
 }

@@ -1,24 +1,35 @@
-# ShinColle-Reforge project-scoped Codex configuration.
-#
-# Root/main agent is fixed to GPT-5.6 Sol.
-# Root reasoning effort is intentionally not forced here; choose the Sol effort
-# appropriate to the task in the Codex UI/CLI.
-#
-# All spawned project subagents default to GPT-5.6 Luna with Max reasoning.
-
+# ShinColle-Reforge project Codex configuration.
 model = "gpt-5.6-sol"
+model_verbosity = "low"
 
-# Leave enough room for the UX-first root AGENTS.md.
-project_doc_max_bytes = 65536
+# Keep actual project instructions small; leave headroom for one scoped override without truncation.
+project_doc_max_bytes = 12288
 
 [agents]
 enabled = true
 default_subagent_model = "gpt-5.6-luna"
-default_subagent_reasoning_effort = "max"
-
-# Main/root thread is excluded.
-# Four concurrent children is enough for, e.g.:
-# legacy analyst + current mapper + API researcher + test/review worker.
-max_concurrent_threads_per_session = 4
-
+default_subagent_reasoning_effort = "medium"
+max_concurrent_threads_per_session = 3
 interrupt_message = true
+
+# Explicit role registration avoids discovery ambiguity and keeps the available set small.
+[agents.legacy_ux_analyst]
+config_file = "agents/legacy_ux_analyst.toml"
+
+[agents.reforge_mapper]
+config_file = "agents/reforge_mapper.toml"
+
+[agents.forge_api_researcher]
+config_file = "agents/forge_api_researcher.toml"
+
+[agents.implementation_worker]
+config_file = "agents/implementation_worker.toml"
+
+[agents.build_verifier]
+config_file = "agents/build_verifier.toml"
+
+[agents.parity_reviewer]
+config_file = "agents/parity_reviewer.toml"
+
+[agents.parity_test_designer]
+config_file = "agents/parity_test_designer.toml"

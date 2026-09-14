@@ -16,6 +16,11 @@ import net.minecraft.world.level.Level;
  */
 public class EntityBattleshipHime extends BasicEntityShipSmall implements IShipRiderType {
 
+    @Override
+    protected EntityType<? extends com.lulan.shincolle.entity.BasicEntityMount> getMountEntityType() {
+        return com.lulan.shincolle.init.ModEntities.MOUNT_BAH.get();
+    }
+
     private int riderType;
 
     public EntityBattleshipHime(EntityType<? extends EntityBattleshipHime> type, Level level) {

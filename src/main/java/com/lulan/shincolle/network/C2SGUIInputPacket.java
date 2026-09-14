@@ -4,11 +4,14 @@ import com.lulan.shincolle.capability.CapaTeitoku;
 import com.lulan.shincolle.capability.CapaTeitokuProvider;
 import com.lulan.shincolle.client.gui.inventory.ContainerFormation;
 import com.lulan.shincolle.client.gui.inventory.ContainerCrane;
+import com.lulan.shincolle.client.gui.inventory.ContainerDesk;
 import com.lulan.shincolle.client.gui.inventory.ContainerLargeShipyard;
 import com.lulan.shincolle.client.gui.inventory.ContainerShipInventory;
 import com.lulan.shincolle.client.gui.inventory.ContainerSmallShipyard;
 import com.lulan.shincolle.client.gui.inventory.ContainerVolCore;
 import com.lulan.shincolle.entity.BasicEntityShip;
+import com.lulan.shincolle.init.ModItems;
+import com.lulan.shincolle.item.PointerItem;
 import com.lulan.shincolle.reference.ID;
 import com.lulan.shincolle.server.ServerDataManager;
 import com.lulan.shincolle.team.TeamData;
@@ -26,7 +29,9 @@ import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.NetworkHooks;
 
@@ -43,6 +48,7 @@ import java.util.function.Supplier;
 public class C2SGUIInputPacket {
     private static final int MAX_VALUES = 16;
     private static final int MAX_STRING_CHARS = 256;
+    private static final double POINTER_RANGE_SQR = 64.0D * 64.0D;
 
     // simple GUI button clicks
     public static final byte ShipBtn = 0;
@@ -304,6 +310,35 @@ public class C2SGUIInputPacket {
     private static boolean hasOpenShipMenu(ServerPlayer player, BasicEntityShip ship) {
         return player.containerMenu instanceof ContainerShipInventory menu
                 && menu.getShip() == ship && menu.stillValid(player);
+    }
+
+    private static ItemStack getHeldPointer(ServerPlayer player) {
+        ItemStack main = player.getMainHandItem();
+        if (main.is(ModItems.POINTER.get())) {
+            return main;
+        }
+        ItemStack off = player.getOffhandItem();
+        return off.is(ModItems.POINTER.get()) ? off : ItemStack.EMPTY;
+    }
+
+    private static boolean hasHeldPointer(ServerPlayer player) {
+        return !getHeldPointer(player).isEmpty();
+    }
+
+    private static boolean hasPointerMode(ServerPlayer player, int mode) {
+        ItemStack pointer = getHeldPointer(player);
+        return !pointer.isEmpty() && mode >= 0 && mode <= 2
+                && Math.floorMod(PointerItem.getMode(pointer), 3) == mode;
+    }
+
+    private static boolean isPointerTargetReachable(ServerPlayer player, Entity target) {
+        return target != null && target.isAlive()
+                && player.distanceToSqr(target) <= POINTER_RANGE_SQR
+                && player.hasLineOfSight(target);
+    }
+
+    private static boolean hasOpenDeskMenu(ServerPlayer player) {
+        return player.containerMenu instanceof ContainerDesk menu && menu.stillValid(player);
     }
 
     private static boolean hasOpenTileMenu(ServerPlayer player, BlockEntity tile) {
@@ -621,8 +656,8 @@ public class C2SGUIInputPacket {
         ServerLevel level = player.serverLevel();
         Entity entity = level.getEntity(values[2]);
 
-        if (entity instanceof BasicEntityShip ship && isOwnedShip(player, ship)
-                && isWithinShipInteractionRange(player, ship)) {
+        if (hasHeldPointer(player) && entity instanceof BasicEntityShip ship && isOwnedShip(player, ship)
+                && isWithinShipInteractionRange(player, ship) && player.hasLineOfSight(ship)) {
             ship.openGUI(player);
         }
     }
@@ -636,14 +671,14 @@ public class C2SGUIInputPacket {
      * If the clicked ship is not in any team, toggles sit for that ship only.
      */
     private void handleSetSitting(ServerPlayer player) {
-        if (values.length < 4)
+        if (values.length < 4 || !hasPointerMode(player, values[2]))
             return;
 
         ServerLevel level = player.serverLevel();
         int mode = values[2];
         Entity entity = level.getEntity(values[3]);
 
-        if (!(entity instanceof BasicEntityShip clickedShip))
+        if (!(entity instanceof BasicEntityShip clickedShip) || !isPointerTargetReachable(player, clickedShip))
             return;
         if (!TeamHelper.checkSameOwner(player, clickedShip) && !clickedShip.isOwnedBy(player))
             return;
@@ -685,14 +720,14 @@ public class C2SGUIInputPacket {
      * values: 0:player eid, 1:(unused dim), 2:entity id, 3:height, 4:angle
      */
     private void handleHitHeight(ServerPlayer player) {
-        if (values.length < 5)
+        if (values.length < 5 || !hasHeldPointer(player))
             return;
 
         ServerLevel level = player.serverLevel();
         Entity entity = level.getEntity(values[2]);
 
         if (entity instanceof BasicEntityShip ship && isOwnedShip(player, ship)
-                && isWithinShipInteractionRange(player, ship)) {
+                && isWithinShipInteractionRange(player, ship) && player.hasLineOfSight(ship)) {
             ship.setStateMinor(ID.M.HitHeight, Math.max(0, Math.min(values[3], 100)));
             ship.setStateMinor(ID.M.HitAngle, Math.floorMod(values[4], 360));
         }
@@ -703,11 +738,12 @@ public class C2SGUIInputPacket {
      * values: 0:player eid, 1:(unused dim), 2:entity id
      */
     private void handleAddTeam(ServerPlayer player) {
-        if (values.length < 3)
+        if (values.length < 3 || !hasHeldPointer(player))
             return;
         ServerLevel level = player.serverLevel();
         Entity entity = level.getEntity(values[2]);
-        if (!(entity instanceof BasicEntityShip ship) || !TeamHelper.checkSameOwner(player, ship)) {
+        if (!(entity instanceof BasicEntityShip ship) || !TeamHelper.checkSameOwner(player, ship)
+                || !isPointerTargetReachable(player, ship)) {
             return;
         }
 
@@ -761,7 +797,7 @@ public class C2SGUIInputPacket {
         int mode = values.length >= 4 ? values[2] : 2;
         int targetId = values.length >= 4 ? values[3] : values[2];
         Entity target = level.getEntity(targetId);
-        if (target == null)
+        if (!hasPointerMode(player, mode) || !isPointerTargetReachable(player, target))
             return;
         if (TargetHelper.isEntityInvulnerable(target)
                 || TeamHelper.checkSameOwner(player, target)
@@ -800,7 +836,7 @@ public class C2SGUIInputPacket {
         int mode = values.length >= 5 ? values[2] : 2;
         int targetId = values.length >= 5 ? values[4] : values[2];
         Entity target = level.getEntity(targetId);
-        if (target == null)
+        if (!hasPointerMode(player, mode) || !isPointerTargetReachable(player, target))
             return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -823,6 +859,9 @@ public class C2SGUIInputPacket {
      * Clear all ships from the selected team.
      */
     private void handleClearTeam(ServerPlayer player) {
+        if (!hasHeldPointer(player)) {
+            return;
+        }
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
         int teamId = capa.getSelectTeam();
@@ -850,7 +889,7 @@ public class C2SGUIInputPacket {
             return;
         ServerLevel level = player.serverLevel();
         Entity entity = level.getEntity(values[2]);
-        if (entity instanceof BasicEntityShip ship && TeamHelper.checkSameOwner(player, ship)) {
+        if (hasHeldPointer(player) && entity instanceof BasicEntityShip ship && TeamHelper.checkSameOwner(player, ship)) {
             ship.setStateMinor(ID.M.FormatType, values[3]);
         }
     }
@@ -860,7 +899,7 @@ public class C2SGUIInputPacket {
      * values: 0:player eid, 1:(unused dim), 2:mode, 3:guardType, 4:x, 5:y, 6:z
      */
     private void handleSetMove(ServerPlayer player) {
-        if (values.length < 7)
+        if (values.length < 7 || !hasPointerMode(player, values[2]))
             return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -871,6 +910,12 @@ public class C2SGUIInputPacket {
         int gx = values[4];
         int gy = values[5];
         int gz = values[6];
+        BlockPos guardPos = new BlockPos(gx, gy, gz);
+        if (!level.isInWorldBounds(guardPos) || !level.getWorldBorder().isWithinBounds(guardPos)
+                || !level.hasChunkAt(guardPos)
+                || player.distanceToSqr(Vec3.atCenterOf(guardPos)) > POINTER_RANGE_SQR) {
+            return;
+        }
         for (int i = 0; i < CapaTeitoku.SLOT_NUM; i++) {
             if (!shouldApplyPointerMode(capa, teamId, i, mode)) {
                 continue;
@@ -892,7 +937,7 @@ public class C2SGUIInputPacket {
      * pointer focus values: 0:player eid, 1:(unused dim), 2:mode, 3:ship uid
      */
     private void handleSetSelect(ServerPlayer player) {
-        if (values.length < 3)
+        if (values.length < 3 || !hasHeldPointer(player))
             return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -920,12 +965,16 @@ public class C2SGUIInputPacket {
      * values: 0:player eid, 1:team index, 2:formation id
      */
     private void handleSetFormation(ServerPlayer player) {
-        if (values.length < 3)
+        if (values.length < 3 || !hasHeldPointer(player)
+                || !(player.containerMenu instanceof ContainerFormation menu) || !menu.stillValid(player))
             return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
         int teamId = values[1];
         if (teamId != capa.getSelectTeam()) {
+            return;
+        }
+        if (values[2] < 0 || values[2] > 5) {
             return;
         }
         capa.setFormatID(teamId, values[2]);
@@ -949,6 +998,9 @@ public class C2SGUIInputPacket {
      * Uses stringData for the class name.
      */
     private void handleSetTarClass(ServerPlayer player) {
+        if (!hasHeldPointer(player)) {
+            return;
+        }
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
         int pid = capa.getPlayerUID();
@@ -962,7 +1014,8 @@ public class C2SGUIInputPacket {
      * values: 0:player eid, 1:(unused dim), 2:slot1, 3:slot2
      */
     private void handleSwapShip(ServerPlayer player) {
-        if (values.length < 4)
+        if (values.length < 4 || !hasHeldPointer(player)
+                || !(player.containerMenu instanceof ContainerFormation menu) || !menu.stillValid(player))
             return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -988,7 +1041,8 @@ public class C2SGUIInputPacket {
      * stringData: the new name
      */
     private void handleSetUnitName(ServerPlayer player) {
-        if (values.length < 3 || stringData == null)
+        if (values.length < 3 || stringData == null || !hasHeldPointer(player)
+                || !(player.containerMenu instanceof ContainerFormation menu) || !menu.stillValid(player))
             return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -1004,7 +1058,7 @@ public class C2SGUIInputPacket {
      * values: 0:player eid, 1:(unused dim), 2:gui type (0=formation)
      */
     private void handleOpenItemGUI(ServerPlayer player) {
-        if (values.length < 3)
+        if (values.length < 3 || !hasHeldPointer(player))
             return;
 
         if (values[2] == 0) {// [PORT] 1.10.2 -> 1.20.1: OpenItemGUI is the pointer formation GUI entry
@@ -1025,8 +1079,18 @@ public class C2SGUIInputPacket {
             return;
         }
 
+        ItemStack pointer = getHeldPointer(player);
+        int newMode = values[2];
+        if (pointer.isEmpty() || newMode < 0 || newMode > 5) {
+            return;
+        }
+
+        int oldMode = PointerItem.getMode(pointer);
+        PointerItem.setMode(pointer, newMode);
+        player.getInventory().setChanged();
+
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
-        if (capa == null || values[2] != 0) {
+        if (capa == null || Math.abs(newMode - oldMode) % 3 == 0 || newMode % 3 != 0) {
             return;
         }
 
@@ -1077,7 +1141,7 @@ public class C2SGUIInputPacket {
      * stringData: the team name
      */
     private void handleDeskCreate(ServerPlayer player) {
-        if (stringData == null || stringData.isEmpty())
+        if (!hasOpenDeskMenu(player) || stringData == null || stringData.isEmpty())
             return;
         ServerDataManager.teamCreate(player, stringData);
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
@@ -1092,7 +1156,7 @@ public class C2SGUIInputPacket {
      * stringData: the new team name
      */
     private void handleDeskRename(ServerPlayer player) {
-        if (stringData == null || stringData.isEmpty())
+        if (!hasOpenDeskMenu(player) || stringData == null || stringData.isEmpty())
             return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -1105,6 +1169,7 @@ public class C2SGUIInputPacket {
      * stringData: the target team leader's name
      */
     private void handleDeskAlly(ServerPlayer player) {
+        if (!hasOpenDeskMenu(player)) return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
         int myTid = capa.getPlayerUID();
@@ -1120,6 +1185,7 @@ public class C2SGUIInputPacket {
      * stringData: the target team leader's name
      */
     private void handleDeskBreak(ServerPlayer player) {
+        if (!hasOpenDeskMenu(player)) return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
         int myTid = capa.getPlayerUID();
@@ -1135,6 +1201,7 @@ public class C2SGUIInputPacket {
      * stringData: the target team leader's name
      */
     private void handleDeskBan(ServerPlayer player) {
+        if (!hasOpenDeskMenu(player)) return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
         int myTid = capa.getPlayerUID();
@@ -1152,6 +1219,7 @@ public class C2SGUIInputPacket {
      * stringData: the target team leader's name
      */
     private void handleDeskUnban(ServerPlayer player) {
+        if (!hasOpenDeskMenu(player)) return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
         int myTid = capa.getPlayerUID();
@@ -1176,6 +1244,7 @@ public class C2SGUIInputPacket {
      * Disband the player's own team.
      */
     private void handleDeskDisband(ServerPlayer player) {
+        if (!hasOpenDeskMenu(player)) return;
         ServerDataManager.teamDisband(player);
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -1188,6 +1257,7 @@ public class C2SGUIInputPacket {
      * Full player data sync requested from desk GUI.
      */
     private void handleDeskFuncSync(ServerPlayer player) {
+        if (!hasOpenDeskMenu(player)) return;
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
         ModNetworking.sendToPlayer(S2CGUISyncPacket.syncPlayerFull(capa), player);

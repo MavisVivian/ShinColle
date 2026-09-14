@@ -298,7 +298,12 @@ public abstract class BasicEntityShipHostile extends Mob
 
     @Override
     public void travel(Vec3 travelVec) {
-        super.travel(travelVec);
+        if (this.isInWater()) {
+            EntityHelper.moveEntityInFluid(this, travelVec);
+            this.move(MoverType.SELF, this.getDeltaMovement());
+        } else {
+            super.travel(travelVec);
+        }
     }
 
     // ========== AI Setup ==========

@@ -17,6 +17,11 @@ import net.minecraft.world.level.Level;
  */
 public class EntityCarrierWD extends BasicEntityShipCV implements IShipRiderType {
 
+    @Override
+    protected EntityType<? extends com.lulan.shincolle.entity.BasicEntityMount> getMountEntityType() {
+        return com.lulan.shincolle.init.ModEntities.MOUNT_CAWD.get();
+    }
+
     private int riderType;
 
     public EntityCarrierWD(EntityType<? extends EntityCarrierWD> type, Level level) {

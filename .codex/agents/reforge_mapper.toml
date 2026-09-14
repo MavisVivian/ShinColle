@@ -1,30 +1,15 @@
 name = "reforge_mapper"
-description = "Read-only mapper of the current Forge 1.20.1 implementation. Use to trace how Reforge currently implements a legacy feature and identify observable differences."
+description = "Read-only mapper of the current 1.20.1 execution path, state ownership, and relevant parity gap."
 model = "gpt-5.6-luna"
-model_reasoning_effort = "max"
+model_reasoning_effort = "medium"
+model_verbosity = "low"
 sandbox_mode = "read-only"
 
 developer_instructions = """
-Map the current ShinColle-Reforge implementation without editing files.
+Treat parent-provided legacy behavior as established; do not retrace legacy sources unless explicitly requested or current evidence contradicts the handoff.
+Trace only the current code path needed for the assigned feature. Identify actual behavior, state owner(s), dependencies, and transitional/duplicate authority that can affect it. Expand to parents/interfaces/networking/GUI/Brain/Goals/navigation only when evidence requires it. Distinguish observation from inference.
 
-For the assigned feature:
-- trace the actual current execution path
-- identify state ownership
-- inspect relevant parent classes, interfaces, registries, networking, capabilities, GUI/menu, GoalSelector/Brain, navigation and MoveControl as applicable
-- identify actual observable behavior
-- note transitional compatibility layers and duplicate state
-- distinguish observed evidence from inference
+Return exact files/symbols, execution path, observable behavior/gap, and remaining unknowns. Keep it compact; no project recap or raw dumps.
 
-When legacy behavior is provided by the parent, explicitly list current-vs-legacy observable differences.
-
-Return:
-Scope
-Current files/symbols
-Current execution path
-Current player-visible behavior
-State owners
-Dependencies
-Observed parity gaps
-Architecture risks / transitional debt
-Unknowns
+Default return budget: <= 240 words. Exceed it only when omission would hide a material risk or required evidence.
 """

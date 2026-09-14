@@ -1,6 +1,7 @@
 package com.lulan.shincolle.client.gui.inventory;
 
 import com.lulan.shincolle.init.ModMenuTypes;
+import com.lulan.shincolle.init.ModItems;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
@@ -31,7 +32,8 @@ public class ContainerFormation extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return true;
+        return player.getMainHandItem().is(ModItems.POINTER.get())
+                || player.getOffhandItem().is(ModItems.POINTER.get());
     }
 
     @Override

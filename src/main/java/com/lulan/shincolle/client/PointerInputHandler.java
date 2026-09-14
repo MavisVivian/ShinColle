@@ -35,18 +35,19 @@ public class PointerInputHandler {
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
-
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
         if (player == null || mc.level == null || mc.screen != null) {
             return;
         }
 
-        handleMountMovement(player, mc);
+        if (event.phase == TickEvent.Phase.END) {
+            handleMountMovement(player, mc);
+            return;
+        }
 
+        // Hotbar clicks are consumed by vanilla before the END phase. Handle pointer
+        // shortcuts at START so sprint+number can select a fleet without changing slots.
         ItemStack pointerInUse = getPointerInUse(player);
         if (pointerInUse.isEmpty()) {
             return;

@@ -1,69 +1,17 @@
-# Legacy Porting Rules — Behavior-first
+# Legacy porting rules
 
-## Core rule
+Port observable behavior, not legacy syntax or structure.
 
-Port observable behavior, not source structure.
+For the requested feature:
 
-## Porting sequence
+1. identify the player-visible contract and relevant timing/state
+2. locate the modern subsystem that owns those semantics
+3. verify uncertain 1.20.1/Parchment symbols
+4. implement the smallest reliable equivalent behavior
+5. validate what the compiler cannot prove
 
-For each legacy subsystem:
+Do not preserve old MCP names, inheritance, event/packet patterns, Goals, navigation classes, or compatibility wrappers merely because they existed. Current Reforge abstractions may also be replaced when they block parity.
 
-1. identify player-visible contract
-2. map legacy state/timing/dependencies
-3. map current Reforge state
-4. define parity gap
-5. identify modern 1.20.1 owner/subsystem
-6. design modern implementation
-7. validate observable equivalence
+Take extra care with registry IDs, NBT keys, capabilities, world data, resource IDs, and network contracts. Prefer migration/compatibility when practical and report unavoidable breakage.
 
-## Architecture replacement is allowed
-
-Unlike a conservative maintenance port, this project explicitly allows replacing current Reforge architecture when that is the best route to legacy UX parity.
-
-Examples include:
-
-- replacing a broken Goal port with Brain behavior
-- replacing custom navigation if it cannot reproduce legacy motion
-- replacing current UI/network plumbing while preserving interaction UX
-- consolidating duplicate target state
-
-## What not to preserve automatically
-
-Do not preserve merely because it exists:
-
-- old MCP method names
-- old inheritance
-- old event bus patterns
-- old packet structure
-- current compatibility wrappers
-- current Goal implementation
-- current custom navigation implementation
-
-Preserve behavior.
-
-## What deserves extra caution
-
-These can affect user data or content identity:
-
-- registry IDs
-- NBT keys
-- capability serialization
-- world data
-- recipe/resource IDs
-- packet compatibility in multiplayer
-
-Prefer migration paths.
-
-## Porting report
-
-For each migrated feature record:
-
-```text
-Legacy UX:
-Legacy source:
-Current pre-change behavior:
-Parity gap:
-Modern design:
-Validation:
-Known differences:
-```
+Common traps: method-name substitution without semantic checking; removed lifecycle hooks whose behavior moved elsewhere; old integrated-client assumptions; different GoalSelector scheduling semantics; and equating successful compilation with gameplay parity.

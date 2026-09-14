@@ -1,5 +1,6 @@
 package com.lulan.shincolle.ai.path;
 
+import com.lulan.shincolle.entity.IShipNavigator;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
@@ -99,7 +100,7 @@ public class ShipNavigation extends FlyingPathNavigation {
     private boolean isDirectPathBetweenPoints(Vec3 pos1, Vec3 pos2,
                                               int sizeX, int sizeY, int sizeZ) {
         // 飛行可能なら障害物チェック不要で常にtrue
-        if (this.canFly) return true;
+        if (canFlyNow()) return true;
 
         int x1 = Mth.floor(pos1.x);
         int y1 = (int) pos1.y;
@@ -149,6 +150,12 @@ public class ShipNavigation extends FlyingPathNavigation {
         }
 
         return true;
+    }
+
+    private boolean canFlyNow() {
+        return this.mob instanceof IShipNavigator navigator
+                ? navigator.canFly()
+                : this.canFly;
     }
 
     /** 1.10.2版: isSafeToStandAt の移植 */

@@ -150,11 +150,6 @@ public abstract class BasicEntityAirplane extends BasicEntitySummon
     public void tick() {
         // server side airplane logic (before super.tick which handles host/lifetime
         // checks)
-        if (this.tickCount % 20 == 0 && !this.level().isClientSide()) {
-            System.out.println("target=" + this.getTarget()
-                    + " backHome=" + this.backHome
-                    + " ammoL=" + this.numAmmoLight);
-        }
         if (!this.level().isClientSide()) {
             if (this.host instanceof Entity hostEnt && hostEnt.isAlive()) {
 

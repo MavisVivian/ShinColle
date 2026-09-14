@@ -1,7 +1,12 @@
 package com.lulan.shincolle.client.gui.inventory;
 
+import com.lulan.shincolle.crafting.InventoryCraftingFake;
+import com.lulan.shincolle.init.ModItems;
 import com.lulan.shincolle.init.ModMenuTypes;
 
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -10,6 +15,10 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.CraftingRecipe;
+import net.minecraft.world.item.crafting.RecipeType;
+
+import java.util.Optional;
 
 /**
  * Container/Menu for Recipe Paper item.
@@ -26,6 +35,7 @@ public class ContainerRecipePaper extends AbstractContainerMenu {
     public static final int GHOST_SLOT_COUNT = 10;
 
     private final SimpleContainer recipeInv;
+    private final Inventory playerInventory;
     private final int heldSlot;
 
     /**
@@ -40,8 +50,11 @@ public class ContainerRecipePaper extends AbstractContainerMenu {
      */
     public ContainerRecipePaper(int containerId, Inventory playerInv, int heldSlot) {
         super(ModMenuTypes.RECIPE_PAPER.get(), containerId);
+        this.playerInventory = playerInv;
         this.heldSlot = heldSlot;
         this.recipeInv = new SimpleContainer(GHOST_SLOT_COUNT);
+        loadRecipe(getPaperStack());
+        updateResult(playerInv.player);
 
         // Crafting pattern slots (0-8): 3x3 grid
         for (int row = 0; row < 3; row++) {
@@ -82,7 +95,7 @@ public class ContainerRecipePaper extends AbstractContainerMenu {
                 Slot slot = this.slots.get(slotId);
                 ItemStack carried = getCarried();
 
-                if (carried.isEmpty()) {
+                if (button == 1 || carried.isEmpty()) {
                     // Clear the pattern slot
                     slot.set(ItemStack.EMPTY);
                 } else {
@@ -90,6 +103,10 @@ public class ContainerRecipePaper extends AbstractContainerMenu {
                     ItemStack patternItem = carried.copy();
                     patternItem.setCount(1);
                     slot.set(patternItem);
+                }
+                updateResult(player);
+                if (!player.level().isClientSide()) {
+                    saveRecipe();
                 }
             }
             return;
@@ -99,8 +116,65 @@ public class ContainerRecipePaper extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        // Valid as long as the player has the recipe paper in hand
-        return true;
+        return getPaperStack().is(ModItems.RECIPE_PAPER.get());
+    }
+
+    @Override
+    public void removed(Player player) {
+        if (!player.level().isClientSide()) {
+            saveRecipe();
+        }
+        super.removed(player);
+    }
+
+    private ItemStack getPaperStack() {
+        return heldSlot >= 0 && heldSlot < playerInventory.getContainerSize()
+                ? playerInventory.getItem(heldSlot) : ItemStack.EMPTY;
+    }
+
+    private void loadRecipe(ItemStack paper) {
+        if (!paper.is(ModItems.RECIPE_PAPER.get()) || !paper.hasTag()) {
+            return;
+        }
+        ListTag list = paper.getTag().getList("Recipe", Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag itemTag = list.getCompound(i);
+            int slot = itemTag.getInt("Slot");
+            if (slot >= 0 && slot < CRAFTING_SLOT_COUNT) {
+                recipeInv.setItem(slot, ItemStack.of(itemTag));
+            }
+        }
+    }
+
+    private void updateResult(Player player) {
+        InventoryCraftingFake matrix = new InventoryCraftingFake(3, 3);
+        for (int i = 0; i < CRAFTING_SLOT_COUNT; i++) {
+            matrix.setItem(i, recipeInv.getItem(i).copy());
+        }
+        Optional<CraftingRecipe> match = player.level().getRecipeManager()
+                .getRecipeFor(RecipeType.CRAFTING, matrix, player.level());
+        ItemStack result = match.map(recipe -> recipe.assemble(matrix, player.level().registryAccess()))
+                .orElse(ItemStack.EMPTY);
+        recipeInv.setItem(RESULT_SLOT, result);
+    }
+
+    private void saveRecipe() {
+        ItemStack paper = getPaperStack();
+        if (!paper.is(ModItems.RECIPE_PAPER.get())) {
+            return;
+        }
+        ListTag list = new ListTag();
+        for (int i = 0; i < GHOST_SLOT_COUNT; i++) {
+            ItemStack stack = recipeInv.getItem(i);
+            if (!stack.isEmpty()) {
+                CompoundTag itemTag = new CompoundTag();
+                itemTag.putInt("Slot", i);
+                stack.save(itemTag);
+                list.add(itemTag);
+            }
+        }
+        paper.getOrCreateTag().put("Recipe", list);
+        playerInventory.setChanged();
     }
 
     @Override

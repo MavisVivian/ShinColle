@@ -19,6 +19,11 @@ import net.minecraft.world.level.Level;
  */
 public class EntitySubmHime extends BasicEntityShipSmall implements IShipRiderType, IShipInvisible {
 
+    @Override
+    protected EntityType<? extends com.lulan.shincolle.entity.BasicEntityMount> getMountEntityType() {
+        return com.lulan.shincolle.init.ModEntities.MOUNT_SUH.get();
+    }
+
     private int riderType;
     private float invisibleLevel = 0.3F;
 

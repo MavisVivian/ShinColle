@@ -1,151 +1,64 @@
-# Codex Workflow — UX-first ShinColle port
+# Codex workflow
 
-## Standard task classification
+Use only when a task needs explicit orchestration; `AGENTS.md` is the default path.
 
-Sol first classifies the task:
+## Execution gates
 
-### A. Legacy parity task
+Do not run a fixed pipeline. Run a gate only when its condition is true.
 
-The feature existed in `temp_1_10_2`.
+| Gate | Run when | Skip/reuse when |
+|---|---|---|
+| Legacy trace | parity depends on legacy UX and exact behavior is unknown | same contract is established from unchanged legacy symbols |
+| Current map | ownership/execution path is unclear | relevant current path is established and unchanged |
+| Forge/API research | uncertain 1.20.1/Forge/Parchment semantics affect correctness | repository/dependency evidence or compilation resolves it |
+| Subagent | specialization/parallelism saves more parent context/time than handoff cost | task is local, coupled, or already understood |
+| Test design | behavioral acceptance exists but the smallest useful check is unclear | obvious focused check already covers it |
+| Independent review | change is consequential/cross-cutting | low-risk local/mechanical change has focused evidence |
+| Broad build | integration risk extends beyond the edited slice | narrow validation proves the relevant property |
 
-Use the full parity workflow.
+Stop when behavioral contract, change surface, and validation path are supported. New checks should answer a remaining question, not repeat confidence.
 
-### B. New feature
+## Default routes
 
-No meaningful legacy equivalent exists.
+- **Local/mechanical:** Sol edits + narrow validation; no subagent by default.
+- **Bounded parity:** fill only missing legacy/current evidence, normally with <=2 read-only agents; implement; validate narrowly.
+- **Cross-subsystem:** Sol fixes contract/architecture first; delegate non-overlapping slices; integrate once; one focused review.
+- **Compatibility-sensitive** (save/NBT, registry, packet, world data): verify assumptions before editing; broaden validation by risk.
 
-Use explicit user requirements as the UX specification and perform regression checks against related legacy behavior.
-
-### C. Infrastructure-only task
-
-Build tooling, datagen, internal test harness, etc.
-
-Prioritize correctness and avoid unnecessary gameplay changes.
-
-## Full parity workflow
-
-### 1. Legacy analysis
-
-Delegate to `legacy_ux_analyst` for non-trivial work.
-
-Output must be a player-visible contract, not just a class summary.
-
-### 2. Current mapping
-
-Delegate to `reforge_mapper`.
-
-Determine current behavior and state ownership.
-
-### 3. Gap definition
-
-Sol synthesizes a parity gap:
+## Minimal handoff
 
 ```text
-Legacy expected:
-Current actual:
-Observable difference:
-Why it matters to UX:
+Question: <one output/decision needed>
+Known: <established facts; do not re-derive>
+Scope: <files/symbols/boundary>
+Stop when: <enough evidence>
+Return: <compact result shape>
 ```
 
-### 4. API verification
+Do not attach whole docs, project recaps, or unrelated logs. Treat `Known` as established unless repository evidence contradicts it; report contradictions instead of silently restarting broad investigation.
 
-Use `forge_api_researcher` for any uncertain 1.20.1/Parchment/Forge behavior.
+## Roles and parallelism
 
-### 5. Architecture decision
+Roles: `legacy_ux_analyst`, `reforge_mapper`, `forge_api_researcher`, `implementation_worker`, `build_verifier`, `parity_reviewer`, `parity_test_designer`.
 
-Sol chooses the design that best serves parity.
+Parallelize independent read-only questions. Prefer 1 worker; use 2–3 only when outputs are independent and useful. Avoid concurrent edits to coupled files. Perform one integration/review pass after workers finish, not one review per worker.
 
-Possible result:
+Escalate to Sol before widening scope for persistent-format/registry/network breakage, cross-subsystem hierarchy redesign, ambiguous legacy UX, or parity vs safety/stability conflicts.
 
-- localized fix
-- Goal repair
-- Brain behavior migration
-- state ownership cleanup
-- navigation rewrite
-- GUI/network rewrite
-- subsystem replacement
+## Evidence reuse
 
-Do not choose minimal diff by default.
+Do not pay twice for unchanged evidence.
 
-Choose the smallest architecture that reliably reproduces the required behavior.
+- Reuse legacy contracts while referenced legacy symbols are unchanged.
+- Reuse current maps while relevant current symbols are unchanged.
+- Reuse API findings for the same dependency/version and assumption.
+- Reuse validation only while its declared scope/prerequisites are unchanged; see `BUILD_AND_VALIDATION.md`.
+- On long work, keep durable conclusions only in `.codex/state/active.md`, not worker narratives.
 
-### 6. Test design
+Re-delegate/re-run only after relevant state changed, material uncertainty remains, or new failure contradicts prior evidence.
 
-For consequential behavior, ask `parity_test_designer` to separate:
+## Output and loop discipline
 
-- deterministic automated checks
-- manual/in-game checks
+Prefer `git status --short`, `git diff --stat`, path-scoped diffs, `rg -n`, focused ranges, and narrow Gradle tasks. Capture noisy commands and return relevant diagnostics only; avoid full trees/diffs/logs.
 
-### 7. Implementation
-
-Delegate bounded slices to `implementation_worker` when useful.
-
-For a large redesign, define non-overlapping file/system ownership first.
-
-### 8. Build verification
-
-Use `build_verifier`.
-
-At minimum, compile affected Java when feasible.
-
-### 9. Independent parity review
-
-Use `parity_reviewer` for:
-
-- AI
-- navigation
-- combat
-- GUI flow
-- networking
-- save/state changes
-- large redesigns
-
-### 10. Repair loop
-
-Sol fixes confirmed issues and reruns the relevant checks.
-
-### 11. Parity record
-
-Update `docs/UX_PARITY_MATRIX.md` when the task materially changes/audits a tracked feature.
-
-### 12. Final report
-
-Explain behavior, not merely code.
-
-## Parallelization pattern
-
-Good initial parallel work:
-
-```text
-legacy_ux_analyst  ─┐
-reforge_mapper      ├─> Sol gap synthesis
-api_researcher      ┘
-```
-
-Then:
-
-```text
-Sol architecture
-      ↓
-implementation worker(s)
-      ↓
-build verifier + parity reviewer
-      ↓
-Sol integration/fix
-```
-
-Do not have multiple workers independently redesign the same AI subsystem.
-
-## Escalation triggers
-
-A Luna worker returns to Sol rather than expanding scope when it discovers:
-
-- change to persistent format
-- registry ID change
-- network compatibility break
-- shared entity hierarchy redesign beyond assigned boundary
-- ambiguity about intended legacy UX
-- a conflict between exact legacy behavior and modern safety/stability
-- a second subsystem that must be redesigned to complete the task
-
-Sol then decides whether to widen the task.
+For long work, rewrite `.codex/state/active.md` at meaningful milestones, not every tool call. Do not repeat the same search, delegation, review, or validation a third time unless the hypothesis or repository state changed. When stuck, choose one discriminating check, bounded fix, or explicit blocker instead of another broad pass.

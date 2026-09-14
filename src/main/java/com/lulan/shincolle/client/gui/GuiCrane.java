@@ -89,7 +89,14 @@ public class GuiCrane extends AbstractContainerScreen<ContainerCrane> {
             case 2 -> graphics.blit(TEXTURE, this.leftPos + 23, this.topPos + 36, 189, 101, 13, 13);
         }
 
-        // TODO: per-slot NOT mode indicators (modeItem bitfield not yet ported)
+        for (int i = 0; i < ContainerCrane.GHOST_SLOT_COUNT; i++) {
+            if (this.menu.isItemFilterExcluded(i)) {
+                int rowY = i < 9 ? 65 : 96;
+                int col = i % 9;
+                graphics.drawString(this.font, "!", this.leftPos + 9 + col * 18,
+                        this.topPos + rowY + 1, 0xFFFF5555, true);
+            }
+        }
     }
 
     @Override
@@ -112,7 +119,11 @@ public class GuiCrane extends AbstractContainerScreen<ContainerCrane> {
         String unloadLabel = tr("gui.shincolle.crane.tochest", "To Chest");
         graphics.drawString(this.font, unloadLabel, 21, 85, 0x000000, false);
 
-        // TODO: draw ship name when crane is paired (requires TileEntityCrane.getShip())
+        TileEntityCrane tile = this.menu.getTile();
+        if (tile != null && tile.getDockedShip() != null) {
+            String shipName = tile.getDockedShip().getDisplayName().getString();
+            graphics.drawString(this.font, shipName, 82, 54, 0x404040, false);
+        }
 
         // Player inventory label
         graphics.drawString(this.font, this.playerInventoryTitle, this.inventoryLabelX, this.inventoryLabelY, 0x404040,

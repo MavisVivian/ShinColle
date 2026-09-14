@@ -51,7 +51,9 @@ public class ContainerCrane extends AbstractContainerMenu {
     public static final int DATA_RED_MODE = 8;
     public static final int DATA_LIQUID_MODE = 9;
     public static final int DATA_ENERGY_MODE = 10;
-    public static final int DATA_COUNT = 11;
+    public static final int DATA_ITEM_MODE_LOW = 11;
+    public static final int DATA_ITEM_MODE_HIGH = 12;
+    public static final int DATA_COUNT = 13;
 
     private final TileEntityCrane tile;
     private final ContainerData data;
@@ -111,6 +113,8 @@ public class ContainerCrane extends AbstractContainerMenu {
                     case DATA_RED_MODE -> tile.getRedSignalMode();
                     case DATA_LIQUID_MODE -> tile.getLiquidMode();
                     case DATA_ENERGY_MODE -> tile.getEnergyMode();
+                    case DATA_ITEM_MODE_LOW -> tile.getItemFilterModes() & 0x7FFF;
+                    case DATA_ITEM_MODE_HIGH -> tile.getItemFilterModes() >>> 15;
                     default -> 0;
                 };
             }
@@ -156,10 +160,12 @@ public class ContainerCrane extends AbstractContainerMenu {
 
             if (carried.isEmpty()) {
                 slot.set(ItemStack.EMPTY);
+                if (tile != null) tile.setItemFilterExcluded(slotId, false);
             } else {
                 ItemStack filterItem = carried.copy();
                 filterItem.setCount(1);
                 slot.set(filterItem);
+                if (tile != null) tile.setItemFilterExcluded(slotId, button == 1);
             }
             return;
         }
@@ -213,6 +219,11 @@ public class ContainerCrane extends AbstractContainerMenu {
 
     public boolean isCheckDict() {
         return data.get(DATA_CHECK_DICT) != 0;
+    }
+
+    public boolean isItemFilterExcluded(int slot) {
+        int modes = data.get(DATA_ITEM_MODE_LOW) | (data.get(DATA_ITEM_MODE_HIGH) << 15);
+        return slot >= 0 && slot < GHOST_SLOT_COUNT && (modes & (1 << slot)) != 0;
     }
 
     public int getRedSignalMode() {

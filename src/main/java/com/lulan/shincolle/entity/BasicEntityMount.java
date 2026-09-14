@@ -14,6 +14,7 @@ import com.lulan.shincolle.utility.TeamHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -171,11 +172,26 @@ public abstract class BasicEntityMount extends TamableAnimal
     @Override
     public void aiStep() {
         boolean hadRiderInput = this.keyTick > 0;
+        Vec3 positionBeforeTick = this.position();
         if (hadRiderInput && this.getControllingPassenger() != null) {
             this.getNavigation().stop();
         }
 
         super.aiStep();
+
+        // A server-controlled ridden Mob does not always route through travel().
+        // Preserve the legacy motion update by integrating once when vanilla made
+        // no positional progress during this AI step.
+        LivingEntity rider = this.getControllingPassenger();
+        if (hadRiderInput && rider instanceof Player player
+                && this.position().distanceToSqr(positionBeforeTick) < 1.0E-10D
+                && this.host != null && this.host.isAlive()
+                && this.host.level() == this.level()
+                && !this.host.getStateFlag(ID.F.NoFuel)
+                && TeamHelper.checkSameOwner(player, this.host)) {
+            applyMountMovement(player);
+            this.move(MoverType.SELF, this.getDeltaMovement());
+        }
 
         // Decrement after super.aiStep()/travel so an input retained for ten
         // ticks is applied on the tenth tick as in the canonical update order.
@@ -545,7 +561,7 @@ public abstract class BasicEntityMount extends TamableAnimal
     }
 
     public boolean canFly() {
-        return false;
+        return this.hasEffect(MobEffects.LEVITATION);
     }
 
     public boolean isJumping() {
@@ -554,8 +570,13 @@ public abstract class BasicEntityMount extends TamableAnimal
 
     public float getMoveSpeed() {
         if (this.host != null && this.host.getAttrs() != null) {
-            return this.host.getAttrs().getMoveSpeed();
+            float speed = this.host.getAttrs().getMoveSpeed();
+            if (speed > 0.0F) {
+                return speed;
+            }
         }
+        // Newly created hosts may not have completed their first attribute refresh yet.
+        // Keep mounts controllable during that window, then use the live host speed.
         return 0.3F;
     }
 

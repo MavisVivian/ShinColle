@@ -145,28 +145,27 @@ public class ShipSpawnEgg extends BasicItem {
 
     // ===== Right Click on Block: Spawn Entity =====
 
-    private static boolean consumeSavedEggXpCost(Player player, CompoundTag nbt) {
+    private static int getSavedEggXpCost(Player player, CompoundTag nbt) {
         if (player == null || nbt == null) {
-            return true;
+            return 0;
         }
 
         if (player.getAbilities().instabuild || !nbt.contains(TAG_STATE_MINOR)) {
-            return true;
+            return 0;
         }
 
         int[] attrs = nbt.getIntArray(TAG_STATE_MINOR);
         if (attrs.length <= 0) {
-            return true;
+            return 0;
         }
 
         int shipLevel = attrs[0] / 3; // StateMinor[0] = ShipLevel (raw level)
         if (player.experienceLevel < shipLevel) {
             player.sendSystemMessage(Component.translatable(CHAT_LEVEL_FAIL_KEY));
-            return false;
+            return -1;
         }
 
-        player.giveExperienceLevels(-shipLevel);
-        return true;
+        return shipLevel;
     }
 
     private static void applyEggHoverName(BasicEntityShip ship, ItemStack eggStack) {
@@ -549,7 +548,8 @@ public class ShipSpawnEgg extends BasicItem {
         }
 
         // XP cost for saved eggs (eggs with stored ship data)
-        if (!consumeSavedEggXpCost(player, nbt)) {
+        int xpCost = getSavedEggXpCost(player, nbt);
+        if (xpCost < 0) {
             return InteractionResult.FAIL;
         }
 
@@ -564,6 +564,7 @@ public class ShipSpawnEgg extends BasicItem {
 
         entity.moveTo(x, y, z, player.getYRot(), 0F);
 
+        boolean spawned;
         if (entity instanceof BasicEntityShip ship) {
             // init ship from egg data
             initShipFromEgg(ship, stack, player);
@@ -579,20 +580,31 @@ public class ShipSpawnEgg extends BasicItem {
             // when no saved state is provided.
             bootstrapFreshSpawnCombatState(ship, nbt);
 
-            level.addFreshEntity(ship);
-
             // recalc attributes
             ship.calcShipAttributes(31, true);
+            spawned = level.addFreshEntity(ship);
         } else if (entity instanceof BasicEntityShipHostile hostile) {
             // [PORT] 1.10.2 -> 1.20.1: keep hostile spawn silhouette larger than
             // regular ships by biasing hostile scale level away from 0.
             hostile.initAttrs(1 + level.random.nextInt(3));
-            level.addFreshEntity(hostile);
-            hostile.playAmbientSound();
+            spawned = level.addFreshEntity(hostile);
+            if (spawned) {
+                hostile.playAmbientSound();
+            }
+        } else {
+            spawned = false;
         }
 
-        // consume item in non-creative
+        if (!spawned) {
+            LogHelper.warn("Failed to add ship entity for class: " + shipClass);
+            return InteractionResult.FAIL;
+        }
+
+        // Commit costs only after the entity was actually accepted by the level.
         if (!player.getAbilities().instabuild) {
+            if (xpCost > 0) {
+                player.giveExperienceLevels(-xpCost);
+            }
             stack.shrink(1);
         }
 

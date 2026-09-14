@@ -1,6 +1,7 @@
 package com.lulan.shincolle.client.gui.inventory;
 
 import com.lulan.shincolle.init.ModMenuTypes;
+import com.lulan.shincolle.init.ModItems;
 import com.lulan.shincolle.tileentity.TileEntityDesk;
 
 import net.minecraft.core.BlockPos;
@@ -59,8 +60,15 @@ public class ContainerDesk extends AbstractContainerMenu {
             BlockPos pos = tile.getBlockPos();
             return player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64.0;
         }
-        // Item-based: always valid while open
-        return true;
+        if (guiType == 1) {
+            return player.getMainHandItem().is(ModItems.DESK_ITEM_RADAR.get())
+                    || player.getOffhandItem().is(ModItems.DESK_ITEM_RADAR.get());
+        }
+        if (guiType == 2) {
+            return player.getMainHandItem().is(ModItems.DESK_ITEM_BOOK.get())
+                    || player.getOffhandItem().is(ModItems.DESK_ITEM_BOOK.get());
+        }
+        return false;
     }
 
     @Override

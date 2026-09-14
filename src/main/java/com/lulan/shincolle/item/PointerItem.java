@@ -11,6 +11,7 @@ import com.lulan.shincolle.reference.ID;
 import com.lulan.shincolle.tileentity.ITileGuardPoint;
 import com.lulan.shincolle.utility.ClientRuntimeHelper;
 import com.lulan.shincolle.utility.ParticleHelper;
+import com.lulan.shincolle.utility.TargetHelper;
 import com.lulan.shincolle.utility.TeamHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -120,11 +121,18 @@ public class PointerItem extends BasicItem {
         Entity vehicle = player.getVehicle();
         Entity vehicleHost = (vehicle instanceof BasicEntityMount mount) ? mount.getHostEntity() : null;
 
+        HitResult blockHit = player.pick(range, 1.0F, true);
+        double maxDistanceSqr = range * range;
+        if (blockHit.getType() == HitResult.Type.BLOCK) {
+            maxDistanceSqr = eyePos.distanceToSqr(blockHit.getLocation());
+        }
+
         return ProjectileUtil.getEntityHitResult(
                 player, eyePos, endPos, searchBox,
                 e -> !e.isSpectator() && e.isPickable()
-                        && e != player && e != vehicle && e != vehicleHost,
-                range * range);
+                        && e != player && e != vehicle && e != vehicleHost
+                        && !TargetHelper.isEntityInvulnerable(e),
+                maxDistanceSqr);
     }
 
     /**

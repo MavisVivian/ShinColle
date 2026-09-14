@@ -93,6 +93,7 @@ public class TileEntityCrane extends BasicTileInventory implements MenuProvider 
      * Energy transfer mode (0:none, 1:to ship, 2:to crane).
      */
     private int energyMode = 0;
+    private int itemFilterModes = 0;
     /**
      * Paired chest position
      */
@@ -158,6 +159,26 @@ public class TileEntityCrane extends BasicTileInventory implements MenuProvider 
 
     public boolean isActive() {
         return isActive;
+    }
+
+    public boolean isItemFilterExcluded(int slot) {
+        return slot >= 0 && slot < SLOT_COUNT && (itemFilterModes & (1 << slot)) != 0;
+    }
+
+    public void setItemFilterExcluded(int slot, boolean excluded) {
+        if (slot < 0 || slot >= SLOT_COUNT) {
+            return;
+        }
+        if (excluded) {
+            itemFilterModes |= 1 << slot;
+        } else {
+            itemFilterModes &= ~(1 << slot);
+        }
+        setChanged();
+    }
+
+    public int getItemFilterModes() {
+        return itemFilterModes;
     }
 
     public void setActive(boolean active) {
@@ -450,21 +471,27 @@ public class TileEntityCrane extends BasicTileInventory implements MenuProvider 
         int startSlot = loading ? 0 : 9;
         int endSlot = loading ? 9 : 18;
 
-        boolean hasFilter = false;
+        boolean hasPositiveFilter = false;
         for (int i = startSlot; i < endSlot; i++) {
             ItemStack filterStack = inventory.getStackInSlot(i);
             if (!filterStack.isEmpty()) {
-                hasFilter = true;
-                if (ItemStack.isSameItem(stack, filterStack)) {
-                    if (!checkMetadata || ItemStack.isSameItemSameTags(stack, filterStack)) {
+                boolean matches = ItemStack.isSameItem(stack, filterStack)
+                        && (!checkMetadata || ItemStack.isSameItemSameTags(stack, filterStack));
+                if (isItemFilterExcluded(i)) {
+                    if (matches) {
+                        return false;
+                    }
+                } else {
+                    hasPositiveFilter = true;
+                    if (matches) {
                         return true;
                     }
                 }
             }
         }
 
-        // If no filter is set, allow all items
-        return !hasFilter;
+        // Empty filters and NOT-only filters accept everything not explicitly excluded.
+        return !hasPositiveFilter;
     }
 
     // ==================== Tick Logic ====================
@@ -558,6 +585,7 @@ public class TileEntityCrane extends BasicTileInventory implements MenuProvider 
         tag.putInt("RedSignal", redSignalMode);
         tag.putInt("LiquidMode", liquidMode);
         tag.putInt("EnergyMode", energyMode);
+        tag.putInt("ItemFilterModes", itemFilterModes);
         tag.putInt("PlayerUID", playerUID);
         tag.putLong("ChestPos", chestPos.asLong());
         tag.putLong("NextPos", nextPos.asLong());
@@ -590,6 +618,7 @@ public class TileEntityCrane extends BasicTileInventory implements MenuProvider 
         } else {
             energyMode = tag.getBoolean("EnergyMode") ? 1 : 0;
         }
+        itemFilterModes = tag.getInt("ItemFilterModes") & ((1 << SLOT_COUNT) - 1);
         playerUID = tag.getInt("PlayerUID");
         if (tag.contains("ChestPos"))
             chestPos = BlockPos.of(tag.getLong("ChestPos"));

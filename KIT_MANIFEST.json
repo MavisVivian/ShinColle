@@ -1,5 +1,5 @@
 {
-  "name": "ShinColle-Reforge Codex UX-First Instructions",
+  "name": "ShinColle-Reforge Codex UX-First / Token-Efficient Instructions",
   "prepared_for": {
     "minecraft": "1.20.1",
     "forge": "47.4.0",
@@ -10,9 +10,11 @@
   "agent_policy": {
     "main": "gpt-5.6-sol",
     "subagents": "gpt-5.6-luna",
-    "subagent_reasoning_effort": "max"
+    "subagent_reasoning_effort": "adaptive by role (low/medium/high)",
+    "max_concurrent_threads_per_session": 3
   },
   "highest_priority": "Legacy ShinColle player-facing UX parity",
+  "context_policy": "Keep always-on instructions minimal; route task detail through docs/INDEX.md; shard parity state with closed items kept cold; use a <=2 KB git-ignored active-state cache only for long sessions.",
   "files": [
     ".codex/agents/build_verifier.toml",
     ".codex/agents/forge_api_researcher.toml",
@@ -22,23 +24,30 @@
     ".codex/agents/parity_test_designer.toml",
     ".codex/agents/reforge_mapper.toml",
     ".codex/config.toml",
+    ".codex/state/README.md",
     "AGENTS.md",
     "FIRST_PROMPT.txt",
+    "README_CODEX_SETUP.md",
     "README_CODEX_SETUP_JA.md",
     "docs/AI_BRAIN_MIGRATION.md",
     "docs/BUILD_AND_VALIDATION.md",
     "docs/CODEX_WORKFLOW.md",
     "docs/DECISION_RECORD_TEMPLATE.md",
+    "docs/ENTITY_AI_AND_NAVIGATION.md",
     "docs/FORGE_1_20_1_RULES.md",
+    "docs/INDEX.md",
     "docs/LEGACY_CURRENT_AI_MAP.md",
     "docs/LEGACY_PORTING_RULES.md",
     "docs/LEGACY_SOURCE_GUIDE.md",
-    "docs/PRIMARY_DIRECTIVE.md",
     "docs/PROJECT_CONTEXT.md",
     "docs/TASK_REQUEST_TEMPLATE.md",
     "docs/UX_PARITY_MATRIX.md",
-    "docs/UX_PARITY_TESTING.md",
-    "docs/UX_PARITY_WORKFLOW.md",
+    "docs/parity/INDEX.md",
+    "docs/parity/ai-combat.md",
+    "docs/parity/navigation-entity.md",
+    "docs/parity/ui-interaction.md",
+    "docs/parity/systems-gameplay.md",
+    "docs/parity/CLOSED.md",
     "temp_1_10_2/AGENTS.override.md"
   ]
 }

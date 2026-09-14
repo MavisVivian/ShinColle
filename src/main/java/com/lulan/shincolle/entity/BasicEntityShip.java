@@ -64,6 +64,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.world.ForgeChunkManager;
 import net.minecraftforge.network.NetworkHooks;
@@ -72,7 +73,9 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * SHIP DATA
@@ -166,6 +169,7 @@ public abstract class BasicEntityShip extends TamableAnimal
     private boolean goalRefreshRequested, targetGoalRefreshRequested;
     private boolean fuelStateRefreshRequested;
     private boolean isUpdated;
+    private final Set<ChunkPos> forcedChunks = new HashSet<>();
     private int updateTime = 16;
 
     protected BasicEntityShip(EntityType<? extends BasicEntityShip> type, Level level) {
@@ -247,7 +251,6 @@ public abstract class BasicEntityShip extends TamableAnimal
 
     @Override
     protected @NotNull ShipNavigation createNavigation(@NotNull Level level) {
-        System.out.println("ShipNavigation created");
         return new ShipNavigation(this, level, this.canFly());
     }
 
@@ -2073,7 +2076,7 @@ public abstract class BasicEntityShip extends TamableAnimal
 
     @Override
     public boolean canFly() {
-        return false;
+        return this.hasEffect(MobEffects.LEVITATION);
     }
 
     @Override
@@ -3146,9 +3149,9 @@ public abstract class BasicEntityShip extends TamableAnimal
                 // use training book, owner only
                 else if (stack.getItem() == ModItems.TRAINING_BOOK.get()
                         && TeamHelper.checkSameOwner(player, this)) {
-                    if (this.getLevel() < 150) {
+                    int lvcap = this.getStateFlag(ID.F.IsMarried) ? 150 : 100;
+                    if (this.getLevel() < lvcap) {
                         int lv = this.getLevel() + 5 + this.random.nextInt(6);
-                        int lvcap = this.getStateFlag(ID.F.IsMarried) ? 150 : 100;
                         if (lv > lvcap)
                             lv = lvcap;
 
@@ -3551,10 +3554,11 @@ public abstract class BasicEntityShip extends TamableAnimal
      */
     public void clearChunkLoader() {
         if (!this.level().isClientSide() && this.level() instanceof ServerLevel serverLevel) {
-            int chunkX = Mth.floor(this.getX()) >> 4;
-            int chunkZ = Mth.floor(this.getZ()) >> 4;
-            ForgeChunkManager.forceChunk(
-                    serverLevel, "shincolle", this.getUUID(), chunkX, chunkZ, false, true);
+            for (ChunkPos chunk : new HashSet<>(forcedChunks)) {
+                ForgeChunkManager.forceChunk(
+                        serverLevel, "shincolle", this.getUUID(), chunk.x, chunk.z, false, true);
+            }
+            forcedChunks.clear();
         }
     }
 
@@ -3562,12 +3566,12 @@ public abstract class BasicEntityShip extends TamableAnimal
      * Update chunk loader based on config and level.
      */
     public void updateChunkLoader() {
-        if (ConfigHandler.chunkLoaderMode() <= 0)
+        if (ConfigHandler.chunkLoaderMode() <= 0
+                || this.getStateMinor(ID.M.LevelChunkLoader) <= 0
+                || this.getStateFlag(ID.F.NoFuel) || !this.isAlive()) {
+            clearChunkLoader();
             return;
-        if (this.getStateMinor(ID.M.LevelChunkLoader) <= 0)
-            return;
-        if (this.getStateFlag(ID.F.NoFuel) || !this.isAlive())
-            return;
+        }
 
         applyChunkLoader();
     }
@@ -3579,8 +3583,14 @@ public abstract class BasicEntityShip extends TamableAnimal
         if (!this.level().isClientSide() && this.level() instanceof ServerLevel serverLevel) {
             int chunkX = Mth.floor(this.getX()) >> 4;
             int chunkZ = Mth.floor(this.getZ()) >> 4;
+            ChunkPos chunk = new ChunkPos(chunkX, chunkZ);
             ForgeChunkManager.forceChunk(
                     serverLevel, "shincolle", this.getUUID(), chunkX, chunkZ, enable, true);
+            if (enable) {
+                forcedChunks.add(chunk);
+            } else {
+                forcedChunks.remove(chunk);
+            }
         }
     }
 
@@ -3592,14 +3602,28 @@ public abstract class BasicEntityShip extends TamableAnimal
             int chunkX = Mth.floor(this.getX()) >> 4;
             int chunkZ = Mth.floor(this.getZ()) >> 4;
             int radius = Math.min(this.getStateMinor(ID.M.LevelChunkLoader), 3);
+            Set<ChunkPos> desiredChunks = new HashSet<>();
 
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
-                    ForgeChunkManager.forceChunk(
-                            serverLevel, "shincolle", this.getUUID(),
-                            chunkX + dx, chunkZ + dz, true, true);
+                    desiredChunks.add(new ChunkPos(chunkX + dx, chunkZ + dz));
                 }
             }
+
+            for (ChunkPos chunk : new HashSet<>(forcedChunks)) {
+                if (!desiredChunks.contains(chunk)) {
+                    ForgeChunkManager.forceChunk(
+                            serverLevel, "shincolle", this.getUUID(), chunk.x, chunk.z, false, true);
+                }
+            }
+            for (ChunkPos chunk : desiredChunks) {
+                if (!forcedChunks.contains(chunk)) {
+                    ForgeChunkManager.forceChunk(
+                            serverLevel, "shincolle", this.getUUID(), chunk.x, chunk.z, true, true);
+                }
+            }
+            forcedChunks.clear();
+            forcedChunks.addAll(desiredChunks);
         }
     }
 
@@ -3731,7 +3755,23 @@ public abstract class BasicEntityShip extends TamableAnimal
      * Summon mount entity for this ship. Override in subclass for specific mount.
      */
     public void summonMountEntity() {
-        // default: no mount
+        EntityType<? extends BasicEntityMount> mountType = getMountEntityType();
+        if (mountType == null || this.level().isClientSide()) {
+            return;
+        }
+        BasicEntityMount mount = mountType.create(this.level());
+        if (mount == null) {
+            return;
+        }
+        mount.setHost(this);
+        mount.moveTo(this.getX(), this.getY(), this.getZ(), this.getYRot(), 0.0F);
+        if (this.level().addFreshEntity(mount)) {
+            this.startRiding(mount, true);
+        }
+    }
+
+    protected EntityType<? extends BasicEntityMount> getMountEntityType() {
+        return null;
     }
 
     /**

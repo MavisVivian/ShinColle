@@ -176,7 +176,7 @@ public class EntityHelper {
      * - Horizontal movement uses move speed attribute
      * - Vertical movement controlled by floating depth
      */
-    public static void moveEntityInFluid(BasicEntityShip ship, Vec3 travelVec) {
+    public static <T extends LivingEntity & IShipFloating> void moveEntityInFluid(T ship, Vec3 travelVec) {
         if (!ship.isInWater())
             return;
 
@@ -214,6 +214,31 @@ public class EntityHelper {
 
         // apply drag in water
         ship.setDeltaMovement(motion.x * WATER_DRAG, vy, motion.z * WATER_DRAG);
+    }
+
+    /**
+     * Teleport a ship to an entity without crossing dimensions or forcing an
+     * unloaded destination chunk. Long-distance teleports dismount the ship,
+     * matching the legacy mount-safety behavior.
+     */
+    public static boolean teleportShipToEntity(Mob ship, LivingEntity target,
+                                                double distanceSq, double yOffset) {
+        if (!ConfigHandler.canTeleport() || target == null || ship.level() != target.level()) {
+            return false;
+        }
+
+        double targetY = target.getY() + yOffset;
+        BlockPos targetPos = BlockPos.containing(target.getX(), targetY, target.getZ());
+        if (!ship.level().hasChunkAt(targetPos)) {
+            return false;
+        }
+
+        ship.getNavigation().stop();
+        if (distanceSq > 1024D && ship.isPassenger()) {
+            ship.stopRiding();
+        }
+        ship.teleportTo(target.getX(), targetY, target.getZ());
+        return true;
     }
 
     /**

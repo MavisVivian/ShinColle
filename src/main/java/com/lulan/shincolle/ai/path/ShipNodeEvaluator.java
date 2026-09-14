@@ -1,6 +1,6 @@
 package com.lulan.shincolle.ai.path;
 
-import net.minecraft.client.resources.model.Material;
+import com.lulan.shincolle.entity.IShipNavigator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
@@ -217,6 +217,12 @@ public class ShipNodeEvaluator extends NodeEvaluator {
         return count;
     }
 
+    private boolean canFlyNow() {
+        return this.mob instanceof IShipNavigator navigator
+                ? navigator.canFly()
+                : this.canFly;
+    }
+
     /** getSafePoint の移植 */
     private Node getSafeNode(int x, int y, int z, int pathYOffset) {
         BlockPathTypes type = getShipPathType(this.level, x, y, z);
@@ -229,7 +235,7 @@ public class ShipNodeEvaluator extends NodeEvaluator {
 
         if (type == BlockPathTypes.OPEN) {
             // 飛べるなら落下チェック不要
-            if (canFly) return getNode(x, y, z);
+            if (canFlyNow()) return getNode(x, y, z);
 
             // 飛べない場合: 下に落下先を探す (最大64格, 1.10.2版と同じ)
             Node node = getNode(x, y, z);

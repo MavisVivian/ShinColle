@@ -4,6 +4,7 @@ import com.lulan.shincolle.ai.*;
 import com.lulan.shincolle.capability.CapaTeitoku;
 import com.lulan.shincolle.capability.CapaTeitokuProvider;
 import com.lulan.shincolle.client.gui.inventory.ContainerFormation;
+import com.lulan.shincolle.client.gui.inventory.ContainerRecipePaper;
 import com.lulan.shincolle.client.gui.inventory.ContainerShipInventory;
 import com.lulan.shincolle.crafting.ShipCalc;
 import com.lulan.shincolle.entity.BasicEntityMount;
@@ -29,6 +30,7 @@ import com.lulan.shincolle.playerskill.ShipSkillHandler;
 import com.lulan.shincolle.network.S2CGUISyncPacket;
 import com.lulan.shincolle.reference.ID;
 import com.lulan.shincolle.reference.Reference;
+import com.lulan.shincolle.reference.Values;
 import com.lulan.shincolle.server.ServerDataManager;
 import com.lulan.shincolle.team.TeamData;
 import com.lulan.shincolle.tileentity.BasicTileMulti;
@@ -56,6 +58,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -66,6 +70,8 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.ai.goal.WrappedGoal;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -188,7 +194,7 @@ public final class ShinColleEntityRegistryGameTests {
 
     // 2026/04/07：GitHub Copilotによって確認済み
     @GameTest(template = "empty", templateNamespace = "minecraft")
-    public static void pointerModeNbtAndInvalidModeGuard(GameTestHelper helper) {
+    public static void pointerModeNbtAndServerSyncGuard(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         FakePlayer fakePlayer = FakePlayerFactory.get(level,
                 new GameProfile(UUID.fromString("00000000-0000-0000-0000-000000000002"), "shincolle_gametest_mode"));
@@ -199,12 +205,20 @@ public final class ShinColleEntityRegistryGameTests {
             throw new AssertionError("Pointer mode NBT round-trip failed.");
         }
 
-        PointerItem.setMode(pointer, 3);
         fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, pointer);
-        InteractionResultHolder<ItemStack> useResult = ModItems.POINTER.get().use(level, fakePlayer,
-                InteractionHand.MAIN_HAND);
-        if (useResult.getResult() != InteractionResult.SUCCESS) {
-            throw new AssertionError("Pointer invalid mode should return SUCCESS guard path on server.");
+
+        for (int mode = 0; mode <= 5; mode++) {
+            invokePacketHandler(new C2SGUIInputPacket(C2SGUIInputPacket.SyncPlayerItem,
+                    new int[]{fakePlayer.getId(), 0, mode}), "handleSyncPlayerItem", fakePlayer);
+            if (PointerItem.getMode(pointer) != mode) {
+                throw new AssertionError("Server did not persist valid pointer mode " + mode + ".");
+            }
+        }
+
+        invokePacketHandler(new C2SGUIInputPacket(C2SGUIInputPacket.SyncPlayerItem,
+                new int[]{fakePlayer.getId(), 0, 6}), "handleSyncPlayerItem", fakePlayer);
+        if (PointerItem.getMode(pointer) != 5) {
+            throw new AssertionError("Server accepted an out-of-range pointer mode.");
         }
 
         helper.succeed();
@@ -217,10 +231,15 @@ public final class ShinColleEntityRegistryGameTests {
         ServerPlayer player = createFollowTestOwner(helper, level,
                 UUID.fromString("00000000-0000-0000-0000-000000000004"),
                 "shincolle_pointer_open_item_gui");
-
         C2SGUIInputPacket packet = new C2SGUIInputPacket(
                 C2SGUIInputPacket.OpenItemGUI,
                 new int[]{player.getId(), 0, 0});
+        invokePacketHandler(packet, "handleOpenItemGUI", player);
+        if (player.containerMenu instanceof ContainerFormation) {
+            throw new AssertionError("Pointer OpenItemGUI must reject requests without a held pointer.");
+        }
+
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.POINTER.get()));
         invokePacketHandler(packet, "handleOpenItemGUI", player);
 
         if (!(player.containerMenu instanceof ContainerFormation)) {
@@ -231,6 +250,46 @@ public final class ShinColleEntityRegistryGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = "empty", templateNamespace = "minecraft")
+    public static void recipePaperUsePersistsAndClearsGhostPattern(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        ServerPlayer player = createFollowTestOwner(helper, level,
+                UUID.fromString("00000000-0000-0000-0000-000000000104"),
+                "shincolle_recipe_paper");
+        ItemStack paper = new ItemStack(ModItems.RECIPE_PAPER.get());
+        player.setItemInHand(InteractionHand.MAIN_HAND, paper);
+
+        ModItems.RECIPE_PAPER.get().use(level, player, InteractionHand.MAIN_HAND);
+        if (!(player.containerMenu instanceof ContainerRecipePaper menu)) {
+            throw new AssertionError("Recipe paper use did not open its menu.");
+        }
+
+        menu.setCarried(new ItemStack(Items.IRON_INGOT));
+        menu.clicked(0, 0, ClickType.PICKUP, player);
+        player.closeContainer();
+        ListTag saved = paper.getOrCreateTag().getList("Recipe", Tag.TAG_COMPOUND);
+        if (saved.isEmpty() || saved.getCompound(0).getInt("Slot") != 0
+                || !ItemStack.of(saved.getCompound(0)).is(Items.IRON_INGOT)) {
+            throw new AssertionError("Recipe paper did not persist the ghost pattern.");
+        }
+
+        ModItems.RECIPE_PAPER.get().use(level, player, InteractionHand.MAIN_HAND);
+        if (!(player.containerMenu instanceof ContainerRecipePaper reopened)) {
+            throw new AssertionError("Recipe paper did not reopen its menu.");
+        }
+        reopened.setCarried(new ItemStack(Items.GOLD_INGOT));
+        reopened.clicked(0, 1, ClickType.PICKUP, player);
+        player.closeContainer();
+        saved = paper.getOrCreateTag().getList("Recipe", Tag.TAG_COMPOUND);
+        for (int i = 0; i < saved.size(); i++) {
+            if (saved.getCompound(i).getInt("Slot") == 0) {
+                throw new AssertionError("Recipe paper right-click did not clear the ghost pattern.");
+            }
+        }
+
+        helper.succeed();
+    }
+
     // 2026/04/11：GitHub Copilotによって確認済み
     @GameTest(template = "empty", templateNamespace = "minecraft")
     public static void formationSetUnitNamePacketUpdatesTeamName(GameTestHelper helper) {
@@ -238,6 +297,9 @@ public final class ShinColleEntityRegistryGameTests {
         ServerPlayer player = createFollowTestOwner(helper, level,
                 UUID.fromString("00000000-0000-0000-0000-000000000005"),
                 "shincolle_set_unit_name");
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.POINTER.get()));
+        invokePacketHandler(new C2SGUIInputPacket(C2SGUIInputPacket.OpenItemGUI,
+                new int[]{player.getId(), 0, 0}), "handleOpenItemGUI", player);
 
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -266,6 +328,9 @@ public final class ShinColleEntityRegistryGameTests {
         ServerPlayer player = createFollowTestOwner(helper, level,
                 UUID.fromString("00000000-0000-0000-0000-000000000006"),
                 "shincolle_swap_ship");
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.POINTER.get()));
+        invokePacketHandler(new C2SGUIInputPacket(C2SGUIInputPacket.OpenItemGUI,
+                new int[]{player.getId(), 0, 0}), "handleOpenItemGUI", player);
 
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -306,6 +371,8 @@ public final class ShinColleEntityRegistryGameTests {
         ServerPlayer player = createFollowTestOwner(helper, level,
                 UUID.fromString("00000000-0000-0000-0000-000000000007"),
                 "shincolle_desk_break_by_id");
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.DESK_ITEM_BOOK.get()));
+        ModItems.DESK_ITEM_BOOK.get().use(level, player, InteractionHand.MAIN_HAND);
 
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -342,6 +409,8 @@ public final class ShinColleEntityRegistryGameTests {
         ServerPlayer player = createFollowTestOwner(helper, level,
                 UUID.fromString("00000000-0000-0000-0000-000000000008"),
                 "shincolle_desk_unban_by_id");
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.DESK_ITEM_BOOK.get()));
+        ModItems.DESK_ITEM_BOOK.get().use(level, player, InteractionHand.MAIN_HAND);
 
         CapaTeitoku capa = player.getCapability(CapaTeitokuProvider.CAPABILITY).orElse(null);
 
@@ -1419,6 +1488,7 @@ public final class ShinColleEntityRegistryGameTests {
             if (goal.canUse()) {
                 throw new AssertionError("ShipFollowOwnerGoal should be blocked when ship is sitting.");
             }
+
         } else {
             if (goal.canUse()) {
                 throw new AssertionError(
@@ -1426,8 +1496,242 @@ public final class ShinColleEntityRegistryGameTests {
             }
         }
 
+        ship.setEntitySit(false);
+        ship.setStateMinor(ID.M.CraneState, 0);
+        ship.setStateMinor(ID.M.NumGrudge, 120);
+        ship.setStateFlag(ID.F.CanFollow, true);
+        ship.setLeashedTo(owner, true);
+        if (!invokePrivateBoolean(goal, "isFollowBlockedState")) {
+            throw new AssertionError("ShipFollowOwnerGoal should be blocked while the ship is leashed.");
+        }
+        ship.dropLeash(true, false);
+
+        ship.setStateMinor(ID.M.FormatType, 1);
+        ship.setStateFlag(ID.F.PickItem, true);
+        try {
+            Field ownerField = ShipFollowOwnerGoal.class.getDeclaredField("owner");
+            ownerField.setAccessible(true);
+            ownerField.set(goal, owner);
+            Method updateDistance = ShipFollowOwnerGoal.class.getDeclaredMethod("updateDistance");
+            updateDistance.setAccessible(true);
+            updateDistance.invoke(goal);
+            Field maxDistSq = ShipFollowOwnerGoal.class.getDeclaredField("maxDistSq");
+            maxDistSq.setAccessible(true);
+            if (Math.abs(maxDistSq.getDouble(goal) - 64D) > 0.0001D) {
+                throw new AssertionError(
+                        "Formation item-pickup follow threshold must retain the legacy squared distance 64.");
+            }
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Could not inspect follow distance threshold.", e);
+        }
+
         ship.discard();
         helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "minecraft")
+    public static void shipFleeGoalRestoresLegacyActivationGuards(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Entity entity = ModEntities.BB_KONGOU.get().create(level);
+        if (!(entity instanceof BasicEntityShip ship)) {
+            throw new AssertionError("BB_KONGOU is not BasicEntityShip in flee-goal test.");
+        }
+
+        ServerPlayer owner = createFollowTestOwner(helper, level,
+                UUID.fromString("00000000-0000-0000-0000-000000000053"),
+                "shincolle_flee_owner");
+        owner.moveTo(0.5D, level.getSharedSpawnPos().getY() + 1D, 0.5D, 0F, 0F);
+        ship.moveTo(12.5D, owner.getY(), 0.5D, 0F, 0F);
+        if (!level.addFreshEntity(ship)) {
+            throw new AssertionError("Failed to add ship entity for flee-goal test.");
+        }
+        ship.tame(owner);
+        ship.setOwnerUUID(owner.getUUID());
+        ship.setStateMinor(ID.M.FleeHP, 50);
+        ship.setStateMinor(ID.M.NumGrudge, 120);
+        ship.setHealth(ship.getMaxHealth() * 0.25F);
+
+        ShipFleeGoal goal = new ShipFleeGoal(ship);
+        if (!canFleeWithOwner(goal, owner)) {
+            throw new AssertionError("ShipFleeGoal should activate at low health and valid owner distance."
+                    + " owner=" + ship.getOwner()
+                    + " sitting=" + ship.getIsSitting()
+                    + " leashed=" + ship.getIsLeashed()
+                    + " grudge=" + ship.getStateMinor(ID.M.NumGrudge)
+                    + " fleeHP=" + ship.getStateMinor(ID.M.FleeHP)
+                    + " health=" + ship.getHealth() + "/" + ship.getMaxHealth()
+                    + " distanceSq=" + ship.distanceToSqr(owner));
+        }
+
+        ship.moveTo(2.5D, owner.getY(), 0.5D, 0F, 0F);
+        if (canFleeWithOwner(goal, owner)) {
+            throw new AssertionError("ShipFleeGoal should not activate inside the legacy minimum distance.");
+        }
+
+        ship.moveTo(12.5D, owner.getY(), 0.5D, 0F, 0F);
+        ship.setEntitySit(true);
+        if (canFleeWithOwner(goal, owner)) {
+            throw new AssertionError("ShipFleeGoal should be blocked while sitting.");
+        }
+
+        ship.setEntitySit(false);
+        ship.setStateMinor(ID.M.NumGrudge, 0);
+        if (canFleeWithOwner(goal, owner)) {
+            throw new AssertionError("ShipFleeGoal should be blocked without grudge fuel.");
+        }
+
+        ship.setStateMinor(ID.M.NumGrudge, 120);
+        ship.setLeashedTo(owner, true);
+        if (canFleeWithOwner(goal, owner)) {
+            throw new AssertionError("ShipFleeGoal should be blocked while leashed.");
+        }
+        ship.dropLeash(true, false);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "minecraft")
+    public static void levitationDynamicallyEnablesShipVerticalMoveControl(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Entity entity = ModEntities.BB_KONGOU.get().create(level);
+        if (!(entity instanceof BasicEntityShip ship)) {
+            throw new AssertionError("BB_KONGOU is not BasicEntityShip in levitation movement test.");
+        }
+
+        if (ship.canFly()) {
+            throw new AssertionError("A normal ship should not fly without Levitation.");
+        }
+        ship.addEffect(new MobEffectInstance(MobEffects.LEVITATION, 100));
+        if (!ship.canFly()) {
+            throw new AssertionError("Levitation should dynamically enable ship flight.");
+        }
+
+        ship.setDeltaMovement(Vec3.ZERO);
+        ship.moveTo(0.5D, level.getSharedSpawnPos().getY() + 1D, 0.5D, 0F, 0F);
+        ship.getMoveControl().setWantedPosition(ship.getX() + 4D, ship.getY() + 10D,
+                ship.getZ(), 1D);
+        ship.getMoveControl().tick();
+        if (ship.getDeltaMovement().y <= 0D) {
+            throw new AssertionError("Levitation flight must provide upward MoveControl acceleration.");
+        }
+
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "minecraft")
+    public static void hostileShipUsesSharedWaterMovement(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Entity entity = ModEntities.BB_KONGOU_MOB.get().create(level);
+        if (!(entity instanceof BasicEntityShipHostile ship)) {
+            throw new AssertionError("BB_KONGOU_MOB is not BasicEntityShipHostile in water movement test.");
+        }
+
+        BlockPos waterPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        for (int x = -1; x <= 1; x++) {
+            for (int y = 0; y <= 2; y++) {
+                for (int z = -1; z <= 1; z++) {
+                    level.setBlock(waterPos.offset(x, y, z), Blocks.WATER.defaultBlockState(), 3);
+                }
+            }
+        }
+
+        ship.moveTo(waterPos.getX() + 0.5D, waterPos.getY() + 0.1D,
+                waterPos.getZ() + 0.5D, 0F, 0F);
+        if (!level.addFreshEntity(ship)) {
+            throw new AssertionError("Failed to add hostile ship for water movement test.");
+        }
+        ship.tick();
+        ship.setShipDepth(1D);
+        ship.setShipFloatingDepth(0D);
+        ship.setSpeed(0.3F);
+        ship.setDeltaMovement(Vec3.ZERO);
+        double startX = ship.getX();
+        double startZ = ship.getZ();
+
+        ship.travel(new Vec3(0D, 0D, 1D));
+
+        double movedSq = (ship.getX() - startX) * (ship.getX() - startX)
+                + (ship.getZ() - startZ) * (ship.getZ() - startZ);
+        if (movedSq <= 1.0E-6D || ship.getDeltaMovement().horizontalDistanceSqr() <= 1.0E-6D) {
+            throw new AssertionError("Hostile ship must use shared horizontal water acceleration.");
+        }
+
+        ship.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "minecraft")
+    public static void sharedShipMoveControlSuppliesForwardIntentAndUsesRequestedSpeed(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        assertShipMoveControl(level, ModEntities.DESTROYER_I.get(), "destroyer_i");
+        assertShipMoveControl(level, ModEntities.BB_KONGOU.get(), "bb_kongou");
+        assertShipMoveControl(level, ModEntities.BB_RE.get(), "bb_re");
+        assertShipMoveControl(level, ModEntities.CL_TENRYUU.get(), "cl_tenryuu");
+        assertShipMoveControl(level, ModEntities.CA_ATAGO.get(), "ca_atago");
+        assertShipMoveControl(level, ModEntities.CV_KAGA.get(), "cv_kaga");
+        assertShipMoveControl(level, ModEntities.SS_RO500.get(), "ss_ro500");
+        assertShipMoveControl(level, ModEntities.AIRFIELD_HIME.get(), "airfield_hime");
+
+        assertShipMoveControl(level, ModEntities.DESTROYER_SHIMAKAZE_MOB.get(), "destroyer_shimakaze_mob");
+        assertShipMoveControl(level, ModEntities.BB_KONGOU_MOB.get(), "bb_kongou_mob");
+        assertShipMoveControl(level, ModEntities.CL_TENRYUU_MOB.get(), "cl_tenryuu_mob");
+        assertShipMoveControl(level, ModEntities.CA_ATAGO_MOB.get(), "ca_atago_mob");
+        assertShipMoveControl(level, ModEntities.CV_KAGA_MOB.get(), "cv_kaga_mob");
+        assertShipMoveControl(level, ModEntities.SS_RO500_MOB.get(), "ss_ro500_mob");
+
+        float[] bbReAttributes = Values.ShipAttrMap.get((int) ID.ShipClass.BBRE);
+        if (bbReAttributes == null
+                || Math.abs(bbReAttributes[10] - 0.72F) > 0.0001F) {
+            throw new AssertionError("BB_RE movement growth must match the legacy value.");
+        }
+
+        helper.succeed();
+    }
+
+    private static void assertShipMoveControl(ServerLevel level, EntityType<?> type, String shipName) {
+        Entity entity = type.create(level);
+        if (!(entity instanceof Mob ship)) {
+            throw new AssertionError(shipName + " is not a Mob in movement-control test.");
+        }
+
+        double movementSpeed = ship.getAttributeValue(Attributes.MOVEMENT_SPEED);
+        ship.moveTo(0.5D, level.getSharedSpawnPos().getY() + 1D, 0.5D, 0F, 0F);
+        ship.getMoveControl().setWantedPosition(10.5D, ship.getY(), 0.5D, 0.5D);
+        ship.getMoveControl().tick();
+
+        if (Math.abs(ship.zza - 1F) > 0.0001F) {
+            throw new AssertionError(shipName + " MOVE_TO must supply forward input. control="
+                    + ship.getMoveControl().getClass().getName() + " zza=" + ship.zza
+                    + " speed=" + ship.getSpeed());
+        }
+        if (Math.abs(ship.getSpeed() - movementSpeed * 0.5D) > 0.0001D) {
+            throw new AssertionError(shipName + " movement speed must equal MOVEMENT_SPEED times path speed."
+                    + " expected=" + movementSpeed * 0.5D + " actual=" + ship.getSpeed());
+        }
+
+        ship.getMoveControl().tick();
+        if (Math.abs(ship.zza) > 0.0001F || Math.abs(ship.getSpeed()) > 0.0001F) {
+            throw new AssertionError(shipName + " movement input and speed must reset while MoveControl waits.");
+        }
+    }
+
+    private static boolean canFleeWithOwner(ShipFleeGoal goal, LivingEntity owner) {
+        try {
+            Method method = ShipFleeGoal.class.getDeclaredMethod("canUseWithOwner", LivingEntity.class);
+            method.setAccessible(true);
+            return (boolean) method.invoke(goal, owner);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Could not evaluate ShipFleeGoal activation conditions.", e);
+        }
+    }
+
+    private static boolean invokePrivateBoolean(Object target, String methodName) {
+        try {
+            Method method = target.getClass().getDeclaredMethod(methodName);
+            method.setAccessible(true);
+            return (boolean) method.invoke(target);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Could not invoke " + methodName + ".", e);
+        }
     }
 
     // 2026/04/15：GitHub Copilotによって追加

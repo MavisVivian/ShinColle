@@ -51,3 +51,6 @@ run
 /logs/
 /server.properties
 /src/generated/resources/.cache/
+
+# Codex ephemeral long-session state (template/rules remain tracked)
+/.codex/state/active.md
