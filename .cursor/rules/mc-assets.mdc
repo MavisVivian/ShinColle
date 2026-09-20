@@ -1,0 +1,21 @@
+---
+description: Minecraft 1.20.1 资源 JSON 与语言文件约定
+globs: src/main/resources/**/*.json,src/generated/resources/**/*.json
+alwaysApply: false
+---
+
+# 资源与语言
+
+1.20.1 使用 JSON，不是 1.12 的 `.lang`。语言在 `assets/shincolle/lang/`：`en_us.json`、`zh_cn.json`、`zh_tw.json`、`ja_jp.json`。改显示名时同步这些文件（或对应 datagen）。
+
+- 模型 / blockstate / recipe 跟 1.20.1 格式。
+- 数据生成输出在 `src/generated/resources/`；手改生成物容易被 datagen 覆盖，优先改 `datagen/`。
+- 手写资源放 `src/main/resources/`，命名与 `modid` `shincolle` 一致。
+
+```json
+// BAD: 1.12 key=value
+// item.shincolle.grudge=怨念
+
+// GOOD
+{ "item.shincolle.grudge": "怨念" }
+```

@@ -1,0 +1,21 @@
+---
+description: Forge 1.20.1 Java 约定（DeferredRegister、端分离、网络与存档）
+globs: src/main/java/**/*.java
+alwaysApply: false
+---
+
+# Java / Forge 1.20.1
+
+完整规则见 `docs/forge/FORGE_1_20_1_RULES.md`。不要把 1.10.2 MCP 名直接贴进当前代码；不要混用 Yarn。
+
+- 注册用现有 `DeferredRegister` / `RegistryObject`；尽量保持 registry ID。
+- 客户端渲染/GUI 不得进入服务端路径；玩法权威在服务端。
+- 移植网络时复现交互与状态，而不是旧包结构；改包/NBT 先评估兼容。
+- 舰船 AI：Goal 与 `ShipBrain` 并存，同一意图不要两套权威状态。
+
+```java
+// BAD: 在 common 实体里直接引用客户端 GUI
+// this.minecraft.screen = new GuiShipInventory(...);
+
+// GOOD: 服务端 openMenu；客户端只在 Menu/Screen 注册与渲染层
+```

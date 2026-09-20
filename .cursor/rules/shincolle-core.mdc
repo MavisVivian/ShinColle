@@ -1,0 +1,22 @@
+---
+description: ShinColle-Reforge 项目地图、领域术语与文档路由
+alwaysApply: true
+---
+
+# ShinColle-Reforge
+
+Forge **1.20.1** / 47.4.0，Java **17**，Parchment，`modid=shincolle`，包 `com.lulan.shincolle`。对标遗留目录 `temp_1_10_2`（只读）。硬规则以根目录 `AGENTS.md` 为准；细节按 `docs/INDEX.md` 按需读，不要预载全部 docs。
+
+## 包地图
+
+- `entity/` 舰娘；基类 `BasicEntityShip`；野生变体 `*Mob`
+- `ai/` + `ai/brain/` Goal 与 Brain 并存，改前先追状态权威
+- `capability/` 提督 `CapaTeitoku`；`server/` 世界数据
+- `init/` 注册（实体见 `ModEntities`）；`network/ModNetworking`
+- `datagen/`、`client/`、`tileentity/`、`gametest/`
+
+## 术语
+
+提督 Teitoku、编队 Formation、怨念 Grudge、船坞 Shipyard、姬 Hime、婚戒、装备槽。舰种：DD / CL / CA / BB / CV / SS。
+
+改注册 ID、NBT、包或世界数据前评估存档兼容。回复用简体中文。禁止用编译脚本验证编译问题。

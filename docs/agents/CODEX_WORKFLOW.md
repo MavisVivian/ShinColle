@@ -52,7 +52,7 @@ Do not pay twice for unchanged evidence.
 - Reuse legacy contracts while referenced legacy symbols are unchanged.
 - Reuse current maps while relevant current symbols are unchanged.
 - Reuse API findings for the same dependency/version and assumption.
-- Reuse validation only while its declared scope/prerequisites are unchanged; see `BUILD_AND_VALIDATION.md`.
+- Reuse validation only while its declared scope/prerequisites are unchanged; see `docs/project/BUILD_AND_VALIDATION.md`.
 - On long work, keep durable conclusions only in `.codex/state/active.md`, not worker narratives.
 
 Re-delegate/re-run only after relevant state changed, material uncertainty remains, or new failure contradicts prior evidence.

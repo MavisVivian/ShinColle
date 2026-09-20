@@ -1,0 +1,4 @@
+[submodule "temp_1_10_2"]
+	path = temp_1_10_2
+	url = git@github.com:MavisVivian/ShinColle.git
+	branch = mc-1.10.2

@@ -74,7 +74,7 @@ For AI/scheduling bugs, check priority/flags, `canUse`, continuation/start/tick/
 
 ## Delegation
 
-The main Sol agent owns architecture, integration, and final judgment. Skip delegation for small/local work. For work that benefits from specialization or parallelism, read `docs/CODEX_WORKFLOW.md`; normally use only 2–3 independent roles at once, pass already-known evidence instead of whole docs, and require compact result summaries rather than raw logs or repeated project background.
+The main Sol agent owns architecture, integration, and final judgment. Skip delegation for small/local work. For work that benefits from specialization or parallelism, read `docs/agents/CODEX_WORKFLOW.md`; normally use only 2–3 independent roles at once, pass already-known evidence instead of whole docs, and require compact result summaries rather than raw logs or repeated project background.
 
 ## Validation and completion
 

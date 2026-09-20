@@ -31,4 +31,4 @@ Useful areas when relevant:
 - helpers affecting gameplay: `TargetHelper`, `FormationHelper`, `InteractHelper`, `CombatHelper`, `EntityHelper`, `InventoryHelper`
 - tests: `com/lulan/shincolle/gametest`
 
-For specific legacy/current AI correspondence, use `LEGACY_CURRENT_AI_MAP.md` instead of expanding this file.
+For specific legacy/current AI correspondence, use `docs/legacy/LEGACY_CURRENT_AI_MAP.md` instead of expanding this file.

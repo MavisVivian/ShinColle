@@ -8,7 +8,7 @@
 - `docs/INDEX.md`: 必要時だけ読む文書のルーター
 - `.codex/config.toml`: モデル・サブエージェント設定
 - `.codex/agents/`: 7つの限定ロール
-- `FIRST_PROMPT.txt`: 最小の開始プロンプト
+- `docs/agents/FIRST_PROMPT.txt`: 最小の開始プロンプト
 
 サブエージェントは `legacy_ux_analyst`, `reforge_mapper`, `forge_api_researcher`, `implementation_worker`, `build_verifier`, `parity_reviewer`, `parity_test_designer` のみです。
 

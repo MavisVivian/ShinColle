@@ -6,7 +6,7 @@ This repository keeps always-on Codex context intentionally small.
 - `docs/INDEX.md`: route to task-specific docs only when needed
 - `.codex/config.toml`: Sol root + bounded Luna subagents
 - `.codex/agents/`: seven specialized roles
-- `FIRST_PROMPT.txt`: minimal session starter
+- `docs/agents/FIRST_PROMPT.txt`: minimal session starter
 
 The canonical roles are `legacy_ux_analyst`, `reforge_mapper`, `forge_api_researcher`, `implementation_worker`, `build_verifier`, `parity_reviewer`, and `parity_test_designer`.
 

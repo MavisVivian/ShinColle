@@ -2,21 +2,36 @@
 
 `AGENTS.md` contains the always-on rules. Read documents below only when the task trigger applies.
 
+## Layout
+
+| Directory | Contents |
+|---|---|
+| `docs/project/` | Versions, entry points, build/validation |
+| `docs/forge/` | Forge 1.20.1 / Parchment API rules |
+| `docs/legacy/` | 1.10.2 source guide, porting, AI class map |
+| `docs/ai/` | Brain/Goal migration and navigation debugging |
+| `docs/parity/` | Sharded UX parity tracker |
+| `docs/agents/` | Codex setup and delegation workflow |
+| `docs/templates/` | Task request and decision-record blanks |
+
+Root keeps only `AGENTS.md` (agent policy) and `readme.md` (mod description). Do not touch `temp_1_10_2/**`. Copilot/Codex runtime files stay in `.github/` and `.codex/`.
+
 | Trigger | Read |
 |---|---|
-| Need current project versions/entry points | `PROJECT_CONTEXT.md` |
-| Trace legacy source/behavior | `LEGACY_SOURCE_GUIDE.md` |
-| Port a legacy subsystem/API | `LEGACY_PORTING_RULES.md` |
-| Forge/Parchment lifecycle, mapping, registration, networking, persistence | `FORGE_1_20_1_RULES.md` |
-| Ship AI, Brain state ownership, Goal migration | `AI_BRAIN_MIGRATION.md` |
-| Goal scheduling/navigation debugging | `ENTITY_AI_AND_NAVIGATION.md` |
-| Find legacy ↔ current AI class correspondence | `LEGACY_CURRENT_AI_MAP.md` |
-| Need detailed task orchestration/delegation | `CODEX_WORKFLOW.md` |
+| Need current project versions/entry points | `project/PROJECT_CONTEXT.md` |
+| Trace legacy source/behavior | `legacy/LEGACY_SOURCE_GUIDE.md` |
+| Port a legacy subsystem/API | `legacy/LEGACY_PORTING_RULES.md` |
+| Forge/Parchment lifecycle, mapping, registration, networking, persistence | `forge/FORGE_1_20_1_RULES.md` |
+| Ship AI, Brain state ownership, Goal migration | `ai/AI_BRAIN_MIGRATION.md` |
+| Goal scheduling/navigation debugging | `ai/ENTITY_AI_AND_NAVIGATION.md` |
+| Find legacy ↔ current AI class correspondence | `legacy/LEGACY_CURRENT_AI_MAP.md` |
+| Need detailed task orchestration/delegation | `agents/CODEX_WORKFLOW.md` |
+| Codex session setup (EN/JA) | `agents/CODEX_SETUP.md`, `agents/CODEX_SETUP_JA.md` |
 | Long task may cross compaction/interruption/session boundary | `.codex/state/README.md` |
-| Compile/test/manual parity validation | `BUILD_AND_VALIDATION.md` |
+| Compile/test/manual parity validation | `project/BUILD_AND_VALIDATION.md` |
 | Check/update project parity status | `parity/INDEX.md`, then only matching row(s) |
-| User wants a reusable task request | `TASK_REQUEST_TEMPLATE.md` |
-| A consequential architecture choice needs a durable record | `DECISION_RECORD_TEMPLATE.md` |
+| User wants a reusable task request | `templates/TASK_REQUEST_TEMPLATE.md` |
+| A consequential architecture choice needs a durable record | `templates/DECISION_RECORD_TEMPLATE.md` |
 
 Rules:
 
