@@ -29,6 +29,7 @@ Root keeps only `AGENTS.md` (agent policy) and `readme.md` (mod description). Do
 | Codex session setup (EN/JA) | `agents/CODEX_SETUP.md`, `agents/CODEX_SETUP_JA.md` |
 | Long task may cross compaction/interruption/session boundary | `.codex/state/README.md` |
 | Compile/test/manual parity validation | `project/BUILD_AND_VALIDATION.md` |
+| Add destroyer NA (ナ级) via Blockbench | `project/ADD_DESTROYER_NA.md` |
 | Check/update project parity status | `parity/INDEX.md`, then only matching row(s) |
 | User wants a reusable task request | `templates/TASK_REQUEST_TEMPLATE.md` |
 | A consequential architecture choice needs a durable record | `templates/DECISION_RECORD_TEMPLATE.md` |

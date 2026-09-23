@@ -8,6 +8,7 @@ Reforge 将 PinkaLulan 的 ShinColle 在授权下从 Forge 1.10.2 公开版移�
 - 原作：[PinkaLulan / ShinColle](https://github.com/PinkaLulan/ShinColle)
 - 移植作者：[X](https://x.com/kousakirai)
 - 支持：[Discord](https://discord.gg/t76XJgJugQ)
+- 参考：[舰娘百科](https://zh.kcwiki.cn/wiki/%E6%8A%A4%E5%8D%AB%E6%A0%96%E5%A7%AC)
 
 在游戏中收集可爱的舰娘。功能包括：友好与敌对舰娘、舰载装备、等级系统。
 
@@ -107,3 +108,5 @@ Windows 将 `./gradlew` 换成 `.\gradlew.bat`。`compileJava` 不会生成可�
 ## 后续：创建新舰（尚未实现）
 
 指定舰名后，优先使用上表已有 class id。最小路径：复用相近舰（深海小型级可参考驱逐イ级）→ 新 `Entity*` → `ModEntities` 与属性 → 蛋 → `ClientSetup` 模型层与贴图 → lang / 图鉴。模型在 Blockbench 完成后抄入 `createBodyLayer()`。
+
+驱逐ナ级（驱逐舰 NA 级，`DDNA = 64`）的 Blockbench 与接入步骤见 [docs/project/ADD_DESTROYER_NA.md](docs/project/ADD_DESTROYER_NA.md)。
